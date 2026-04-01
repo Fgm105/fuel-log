@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="燃油記錄">
+<title>燃油記錄</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  :root {
+    --bg: #f2f2f7;
+    --card: #ffffff;
+    --card2: #f2f2f7;
+    --text: #1c1c1e;
+    --text2: #6c6c70;
+    --text3: #aeaeb2;
+    --border: rgba(0,0,0,0.1);
+    --accent: #007aff;
+    --accent-bg: rgba(0,122,255,0.1);
+    --green: #34c759;
+    --green-bg: rgba(52,199,89,0.12);
+    --red: #ff3b30;
+    --red-bg: rgba(255,59,48,0.12);
+    --yellow: #ff9f0a;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --safe-top: env(safe-area-inset-top, 44px);
+    --safe-bottom: env(safe-area-inset-bottom, 34px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --card: #1c1c1e;
+      --card2: #2c2c2e;
+      --text: #ffffff;
+      --text2: #98989f;
+      --text3: #48484a;
+      --border: rgba(255,255,255,0.1);
+      --accent: #0a84ff;
+      --accent-bg: rgba(10,132,255,0.15);
+      --green: #30d158;
+      --green-bg: rgba(48,209,88,0.15);
+      --red: #ff453a;
+      --red-bg: rgba(255,69,58,0.15);
+      --yellow: #ffd60a;
+    }
+  }
+  html, body { height: 100%; background: var(--bg); font-family: -apple-system, 'Helvetica Neue', sans-serif; color: var(--text); overflow: hidden; }
+  .app { display: flex; flex-direction: column; height: 100%; }
+  .status-bar { height: var(--safe-top); background: var(--card); flex-shrink: 0; }
+  .header { background: var(--card); padding: 0 16px 12px; flex-shrink: 0; border-bottom: 0.5px solid var(--border); display: flex; align-items: flex-end; justify-content: space-between; }
+  .header-spacer { height: 2.4em; }
+  .header h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .header-right { display: flex; align-items: center; gap: 8px; padding-bottom: 2px; }
+
+  /* Sync status indicator */
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); flex-shrink: 0; transition: background 0.3s; }
+  .sync-dot.synced { background: var(--green); }
+  .sync-dot.syncing { background: var(--yellow); animation: pulse 1s infinite; }
+  .sync-dot.error { background: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .sync-label { font-size: 12px; color: var(--text2); }
+
+  .tab-bar { display: flex; background: var(--card); border-bottom: 0.5px solid var(--border); flex-shrink: 0; }
+  .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 8px 0 10px; gap: 3px; cursor: pointer; border: none; background: none; color: var(--text3); font-size: 10px; font-family: -apple-system, sans-serif; }
+  .tab-item .icon { font-size: 22px; }
+  .tab-item.active { color: var(--accent); }
+  .content { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: calc(var(--safe-bottom) + 16px); }
+  .page { display: none; padding: 16px; }
+  .page.active { display: block; }
+  .section-label { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.04em; margin: 0 4px 6px; }
+  .card { background: var(--card); border-radius: var(--radius); margin-bottom: 20px; overflow: hidden; }
+  .card-row { display: flex; align-items: center; padding: 13px 16px; border-bottom: 0.5px solid var(--border); gap: 12px; }
+  .card-row:last-child { border-bottom: none; }
+  .row-label { font-size: 15px; color: var(--text); flex: 1; }
+  .row-input { font-size: 15px; color: var(--text); background: none; border: none; outline: none; text-align: right; width: 140px; font-family: -apple-system, sans-serif; -moz-appearance: textfield; }
+  .row-input::-webkit-outer-spin-button, .row-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .row-input::placeholder { color: var(--text3); }
+  .row-unit { font-size: 15px; color: var(--text2); margin-left: 4px; }
+  textarea.row-input { text-align: left; resize: none; height: 60px; padding: 0; line-height: 1.4; }
+  .adj-input { font-size: 17px; font-weight: 600; color: var(--accent); background: none; border: none; outline: none; text-align: right; width: 72px; font-family: -apple-system, sans-serif; -moz-appearance: textfield; }
+  .adj-input::-webkit-outer-spin-button, .adj-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .btn-primary { width: 100%; padding: 14px; background: var(--accent); color: white; border: none; border-radius: var(--radius); font-size: 17px; font-weight: 600; font-family: -apple-system, sans-serif; cursor: pointer; margin-bottom: 20px; }
+  .btn-primary:active { opacity: 0.8; }
+  .btn-secondary { width: 100%; padding: 12px; background: var(--card); color: var(--accent); border: 1px solid var(--border); border-radius: var(--radius); font-size: 15px; font-weight: 600; font-family: -apple-system, sans-serif; cursor: pointer; margin-bottom: 12px; }
+  .btn-danger { width: 100%; padding: 12px; background: var(--red-bg); color: var(--red); border: none; border-radius: var(--radius); font-size: 15px; font-weight: 600; font-family: -apple-system, sans-serif; cursor: pointer; margin-bottom: 12px; }
+  .preview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .mini-card { background: var(--card); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .mini-label { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+  .mini-val { font-size: 18px; font-weight: 600; color: var(--text); }
+  .mini-unit { font-size: 11px; color: var(--text2); font-weight: 400; }
+  .big-metric { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; display: flex; align-items: baseline; gap: 8px; }
+  .big-num { font-size: 42px; font-weight: 700; letter-spacing: -1px; }
+  .big-unit { font-size: 16px; color: var(--text2); }
+  .compare-card { background: var(--card); border-radius: var(--radius); margin-bottom: 20px; overflow: hidden; }
+  .compare-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 0.5px solid var(--border); }
+  .compare-row:last-child { border-bottom: none; }
+  .compare-label { font-size: 13px; color: var(--text2); margin-bottom: 4px; }
+  .compare-nums { display: flex; align-items: baseline; gap: 8px; }
+  .prev-num { font-size: 14px; color: var(--text3); }
+  .curr-num { font-size: 18px; font-weight: 600; }
+  .badge { font-size: 12px; font-weight: 600; padding: 4px 8px; border-radius: 6px; }
+  .badge.better { background: var(--green-bg); color: var(--green); }
+  .badge.worse { background: var(--red-bg); color: var(--red); }
+  .badge.neutral { background: var(--accent-bg); color: var(--accent); }
+  .chart-container { background: var(--card); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; }
+  .chart-wrap { position: relative; height: 160px; }
+  .history-item { display: flex; align-items: center; padding: 13px 16px; border-bottom: 0.5px solid var(--border); gap: 12px; }
+  .history-item:last-child { border-bottom: none; }
+  .history-date { font-size: 13px; color: var(--text2); min-width: 72px; }
+  .history-main { flex: 1; }
+  .history-cons { font-size: 16px; font-weight: 600; }
+  .history-sub { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .history-note { font-size: 11px; color: var(--text3); max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .del-btn { background: var(--red-bg); color: var(--red); border: none; border-radius: 6px; padding: 5px 10px; font-size: 13px; font-family: -apple-system, sans-serif; cursor: pointer; flex-shrink: 0; }
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text2); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-text { font-size: 16px; }
+  .toast { position: fixed; bottom: calc(var(--safe-bottom) + 80px); left: 50%; transform: translateX(-50%) translateY(20px); background: rgba(0,0,0,0.8); color: white; padding: 10px 20px; border-radius: 20px; font-size: 14px; opacity: 0; transition: all 0.3s; pointer-events: none; white-space: nowrap; z-index: 999; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* Settings page */
+  .setting-desc { font-size: 13px; color: var(--text2); margin: 0 4px 16px; line-height: 1.5; }
+  .row-input-full { font-size: 14px; color: var(--text); background: none; border: none; outline: none; text-align: right; flex: 1; font-family: -apple-system, monospace; min-width: 0; }
+  .row-input-full::placeholder { color: var(--text3); font-family: -apple-system, sans-serif; }
+
+  /* Info box */
+  .info-box { background: var(--accent-bg); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: var(--accent); line-height: 1.5; }
+  .info-box a { color: var(--accent); }
+  .warn-box { background: var(--red-bg); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: var(--red); line-height: 1.5; }
+
+  /* Pending badge */
+  .pending-badge { background: var(--yellow); color: #000; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; margin-left: 6px; vertical-align: middle; }
+
+  /* Loading spinner */
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--text3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="status-bar"></div>
+  <div class="header">
+    <div>
+      <div class="header-spacer"></div>
+      <h1>⛽ 燃油記錄</h1>
+    </div>
+    <div class="header-right">
+      <div class="sync-dot" id="syncDot"></div>
+      <span class="sync-label" id="syncLabel">未連線</span>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-item active" onclick="showTab('log',this)">
+      <span class="icon">📝</span><span>記錄</span>
+    </button>
+    <button class="tab-item" onclick="showTab('analysis',this)">
+      <span class="icon">📊</span><span>分析</span>
+    </button>
+    <button class="tab-item" onclick="showTab('history',this)">
+      <span class="icon">🕐</span><span>歷史</span>
+    </button>
+    <button class="tab-item" onclick="showTab('settings',this)">
+      <span class="icon">⚙️</span><span>設定</span>
+    </button>
+  </div>
+
+  <div class="content">
+    <!-- LOG PAGE -->
+    <div class="page active" id="page-log">
+      <div class="section-label">入油資料</div>
+      <div class="card">
+        <div class="card-row">
+          <span class="row-label">總里程</span>
+          <input class="row-input" type="number" id="f-total" inputmode="decimal" placeholder="85420">
+          <span class="row-unit">km</span>
+        </div>
+        <div class="card-row">
+          <span class="row-label">入油量</span>
+          <input class="row-input" type="number" id="f-fuel" inputmode="decimal" placeholder="42.5">
+          <span class="row-unit">L</span>
+        </div>
+        <div class="card-row">
+          <span class="row-label">入油總價</span>
+          <input class="row-input" type="number" id="f-totalcost" inputmode="decimal" placeholder="830.00">
+          <span class="row-unit">$</span>
+        </div>
+        <div class="card-row">
+          <span class="row-label">Trip 里程</span>
+          <input class="row-input" type="number" id="f-trip" inputmode="decimal" placeholder="430">
+          <span class="row-unit">km</span>
+        </div>
+        <div class="card-row">
+          <span class="row-label">誤差調整</span>
+          <input class="adj-input" type="number" id="f-adj" inputmode="decimal" value="100">
+          <span class="row-unit">%</span>
+        </div>
+        <div class="card-row" style="align-items:flex-start; padding-top:13px;">
+          <span class="row-label">備註</span>
+          <textarea class="row-input" id="f-notes" placeholder="高速公路為主..."></textarea>
+        </div>
+      </div>
+
+      <div id="preview-area" style="display:none;">
+        <div class="section-label">即時計算</div>
+        <div class="preview-grid" id="preview-grid"></div>
+      </div>
+
+      <button class="btn-primary" id="saveBtn" onclick="saveEntry()">儲存記錄</button>
+    </div>
+
+    <!-- ANALYSIS PAGE -->
+    <div class="page" id="page-analysis">
+      <div id="analysis-body"></div>
+    </div>
+
+    <!-- HISTORY PAGE -->
+    <div class="page" id="page-history">
+      <div id="history-body"></div>
+    </div>
+
+    <!-- SETTINGS PAGE -->
+    <div class="page" id="page-settings">
+      <div class="section-label">Google Sheets 連線</div>
+      <div class="info-box">
+        📋 <strong>設定步驟：</strong><br>
+        1. 複製一份 <a href="https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/copy" target="_blank">模板試算表</a>（或自建）<br>
+        2. 在 Google Sheets 建立 Apps Script Web App<br>
+        3. 部署為「任何人可存取」的 Web App<br>
+        4. 貼上 Web App 網址及 Sheet ID
+      </div>
+
+      <div class="section-label">Web App 設定</div>
+      <div class="card">
+        <div class="card-row">
+          <span class="row-label">Web App URL</span>
+          <input class="row-input-full" type="url" id="s-webapp" inputmode="url" placeholder="https://script.google.com/...">
+        </div>
+        <div class="card-row">
+          <span class="row-label">Sheet ID</span>
+          <input class="row-input-full" type="text" id="s-sheetid" placeholder="1BxiMVs0XRA5nF...">
+        </div>
+        <div class="card-row">
+          <span class="row-label">Sheet 名稱</span>
+          <input class="row-input-full" type="text" id="s-sheetname" placeholder="燃油記錄">
+        </div>
+      </div>
+      <button class="btn-secondary" onclick="testConnection()">🔗 測試連線</button>
+      <button class="btn-primary" style="margin-top:0;" onclick="saveSettings()">儲存設定</button>
+
+      <div class="section-label" style="margin-top:8px;">本機資料</div>
+      <div class="card">
+        <div class="card-row">
+          <span class="row-label">本機記錄數</span>
+          <span id="local-count" style="font-size:16px;font-weight:600;">0</span>
+        </div>
+        <div class="card-row">
+          <span class="row-label">待同步記錄</span>
+          <span id="pending-count" style="font-size:16px;font-weight:600;color:var(--yellow);">0</span>
+        </div>
+      </div>
+      <button class="btn-secondary" onclick="syncNow()">☁️ 立即同步</button>
+      <button class="btn-secondary" onclick="importFromSheets()">⬇️ 從 Sheets 匯入</button>
+      <button class="btn-danger" onclick="clearLocal()">🗑️ 清除本機資料</button>
+
+      <div class="section-label">Apps Script 程式碼</div>
+      <div class="info-box" style="font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;">// 貼到 Apps Script 編輯器並部署
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const ss = SpreadsheetApp.openById(data.sheetId);
+    const sh = ss.getSheetByName(data.sheetName) || ss.getSheets()[0];
+    
+    if (data.action === 'append') {
+      if (sh.getLastRow() === 0) {
+        sh.appendRow(['ID','日期','總里程(km)','入油量(L)',
+          '入油總價($)','Trip里程(km)','調整%','備註']);
+      }
+      const r = data.row;
+      sh.appendRow([r.id, r.date, r.totalKm||'', r.fuelL,
+        r.totalCost||'', r.tripKm, r.adjFactor, r.notes||'']);
+    }
+    
+    if (data.action === 'delete') {
+      const vals = sh.getDataRange().getValues();
+      for (let i = 1; i < vals.length; i++) {
+        if (String(vals[i][0]) === String(data.id)) {
+          sh.deleteRow(i + 1); break;
+        }
+      }
+    }
+    
+    if (data.action === 'getAll') {
+      const vals = sh.getDataRange().getValues();
+      const rows = vals.slice(1).map(r => ({
+        id: r[0], date: r[1], totalKm: r[2]||null,
+        fuelL: parseFloat(r[3]), totalCost: r[4]||null,
+        tripKm: parseFloat(r[5]), adjFactor: parseFloat(r[6])||100,
+        notes: r[7]||''
+      }));
+      return ContentService
+        .createTextOutput(JSON.stringify({ok:true,rows}))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    
+    return ContentService
+      .createTextOutput(JSON.stringify({ok:true}))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ok:false,error:err.message}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({ok:true,status:'ready'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}</div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ── Mini Line Chart ── */
+function drawLineChart(canvasId, labels, data, isDark) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.scale(dpr, dpr);
+  const pad = { top: 16, right: 16, bottom: 36, left: 44 };
+  const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
+  const accent = isDark ? '#0a84ff' : '#007aff';
+  const gridCol = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const textCol = isDark ? '#98989f' : '#6c6c70';
+  const minV = Math.min(...data), maxV = Math.max(...data);
+  const range = maxV - minV || 1, pad1 = range * 0.15;
+  const vMin = minV - pad1, vMax = maxV + pad1;
+  const xOf = i => pad.left + (i / (data.length - 1 || 1)) * cw;
+  const yOf = v => pad.top + ch - ((v - vMin) / (vMax - vMin)) * ch;
+  ctx.strokeStyle = gridCol; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (ch / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    const val = vMax - ((vMax - vMin) / 4) * i;
+    ctx.fillStyle = textCol; ctx.font = `10px -apple-system,sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(1), pad.left - 6, y + 3.5);
+  }
+  ctx.fillStyle = textCol; ctx.textAlign = 'center';
+  const step = data.length <= 6 ? 1 : Math.ceil(data.length / 6);
+  labels.forEach((lbl, i) => {
+    if (i % step !== 0 && i !== labels.length - 1) return;
+    ctx.fillText(lbl, xOf(i), H - pad.bottom + 14);
+  });
+  if (data.length < 2) return;
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ch);
+  grad.addColorStop(0, isDark ? 'rgba(10,132,255,0.18)' : 'rgba(0,122,255,0.12)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(data[0]));
+  for (let i = 1; i < data.length; i++) {
+    const xm = (xOf(i-1) + xOf(i)) / 2;
+    ctx.bezierCurveTo(xm, yOf(data[i-1]), xm, yOf(data[i]), xOf(i), yOf(data[i]));
+  }
+  ctx.lineTo(xOf(data.length-1), pad.top + ch);
+  ctx.lineTo(xOf(0), pad.top + ch);
+  ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(data[0]));
+  for (let i = 1; i < data.length; i++) {
+    const xm = (xOf(i-1) + xOf(i)) / 2;
+    ctx.bezierCurveTo(xm, yOf(data[i-1]), xm, yOf(data[i]), xOf(i), yOf(data[i]));
+  }
+  ctx.strokeStyle = accent; ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.stroke();
+  data.forEach((v, i) => {
+    ctx.beginPath();
+    ctx.arc(xOf(i), yOf(v), 4, 0, Math.PI * 2);
+    ctx.fillStyle = accent; ctx.fill();
+    ctx.strokeStyle = isDark ? '#1c1c1e' : '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+  });
+}
+
+/* ── State ── */
+let entries = [];
+let pendingSync = []; // {action:'append'|'delete', entry/id}
+let cfg = { webAppUrl: '', sheetId: '', sheetName: '燃油記錄' };
+
+function loadLocal() {
+  try { entries = JSON.parse(localStorage.getItem('fuel_entries') || '[]'); } catch(e){ entries=[]; }
+  try { pendingSync = JSON.parse(localStorage.getItem('fuel_pending') || '[]'); } catch(e){ pendingSync=[]; }
+  try { const s = JSON.parse(localStorage.getItem('fuel_cfg') || '{}'); if(s.webAppUrl) cfg = s; } catch(e){}
+}
+
+function saveLocal() {
+  localStorage.setItem('fuel_entries', JSON.stringify(entries));
+  localStorage.setItem('fuel_pending', JSON.stringify(pendingSync));
+  updateSyncUI();
+}
+
+function saveCfg() {
+  localStorage.setItem('fuel_cfg', JSON.stringify(cfg));
+}
+
+/* ── Sync UI ── */
+function updateSyncUI() {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  const pc = pendingSync.length;
+  const localCount = document.getElementById('local-count');
+  const pendingCount = document.getElementById('pending-count');
+  if (localCount) localCount.textContent = entries.length;
+  if (pendingCount) pendingCount.textContent = pc;
+
+  if (!cfg.webAppUrl) {
+    dot.className = 'sync-dot';
+    lbl.textContent = '未連線';
+  } else if (pc > 0) {
+    dot.className = 'sync-dot error';
+    lbl.textContent = `待同步 ${pc}`;
+  } else {
+    dot.className = 'sync-dot synced';
+    lbl.textContent = '已同步';
+  }
+}
+
+function setSyncing(on) {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  if (on) { dot.className = 'sync-dot syncing'; lbl.textContent = '同步中…'; }
+  else updateSyncUI();
+}
+
+/* ── Google Sheets API via Apps Script ── */
+async function sheetsPost(payload) {
+  if (!cfg.webAppUrl) throw new Error('未設定 Web App URL');
+  payload.sheetId = cfg.sheetId;
+  payload.sheetName = cfg.sheetName || '燃油記錄';
+  const res = await fetch(cfg.webAppUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain' }, // avoid CORS preflight
+    body: JSON.stringify(payload)
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || '未知錯誤');
+  return json;
+}
+
+async function flushPending() {
+  if (!cfg.webAppUrl || pendingSync.length === 0) return;
+  setSyncing(true);
+  const failed = [];
+  for (const item of pendingSync) {
+    try {
+      if (item.action === 'append') {
+        await sheetsPost({ action: 'append', row: item.entry });
+      } else if (item.action === 'delete') {
+        await sheetsPost({ action: 'delete', id: item.id });
+      }
+    } catch(e) {
+      failed.push(item);
+    }
+  }
+  pendingSync = failed;
+  saveLocal();
+  setSyncing(false);
+}
+
+/* ── Calc ── */
+function calc(e) {
+  const adjFactor = (e.adjFactor != null ? e.adjFactor : 100) / 100;
+  const adjTrip = e.tripKm * adjFactor;
+  const consumption = e.fuelL / adjTrip * 100;
+  const totalCost = e.totalCost || null;
+  const pricePerL = (totalCost && e.fuelL) ? totalCost / e.fuelL : null;
+  const costPerKm = (totalCost && adjTrip) ? totalCost / adjTrip : null;
+  return { adjTrip, consumption, totalCost, pricePerL, costPerKm };
+}
+
+/* ── Live calc ── */
+function liveCalc() {
+  const fuel = parseFloat(document.getElementById('f-fuel').value);
+  const trip = parseFloat(document.getElementById('f-trip').value);
+  const totalCost = parseFloat(document.getElementById('f-totalcost').value);
+  const adjRaw = document.getElementById('f-adj').value;
+  const adj = (!adjRaw || isNaN(parseFloat(adjRaw))) ? 100 : parseFloat(adjRaw);
+  if (!fuel || !trip) { document.getElementById('preview-area').style.display='none'; return; }
+  const adjTrip = trip * (adj / 100);
+  const cons = fuel / adjTrip * 100;
+  const ppl = (totalCost && fuel) ? totalCost / fuel : null;
+  const cpp = (totalCost && adjTrip) ? totalCost / adjTrip : null;
+  document.getElementById('preview-area').style.display = '';
+  document.getElementById('preview-grid').innerHTML = `
+    <div class="mini-card"><div class="mini-label">調整後里程</div><div class="mini-val">${adjTrip.toFixed(1)}<span class="mini-unit"> km</span></div></div>
+    <div class="mini-card"><div class="mini-label">油耗</div><div class="mini-val">${cons.toFixed(2)}<span class="mini-unit"> L/100</span></div></div>
+    ${ppl ? `<div class="mini-card"><div class="mini-label">油價</div><div class="mini-val">$${ppl.toFixed(2)}<span class="mini-unit">/L</span></div></div>` : ''}
+    ${cpp ? `<div class="mini-card"><div class="mini-label">每公里費用</div><div class="mini-val">$${cpp.toFixed(3)}</div></div>` : ''}
+  `;
+}
+
+['f-fuel','f-totalcost','f-trip','f-total','f-adj','f-notes'].forEach(id =>
+  document.getElementById(id).addEventListener('input', liveCalc)
+);
+
+/* ── Save Entry ── */
+async function saveEntry() {
+  const fuel = parseFloat(document.getElementById('f-fuel').value);
+  const trip = parseFloat(document.getElementById('f-trip').value);
+  const totalCost = parseFloat(document.getElementById('f-totalcost').value);
+  const total = parseFloat(document.getElementById('f-total').value);
+  const adjRaw = document.getElementById('f-adj').value;
+  const adjFactor = (!adjRaw || isNaN(parseFloat(adjRaw))) ? 100 : parseFloat(adjRaw);
+  const notes = document.getElementById('f-notes').value.trim();
+  if (!fuel || !trip) { showToast('請填寫入油量及 Trip 里程'); return; }
+
+  const now = new Date();
+  const entry = {
+    id: Date.now(),
+    date: now.toLocaleDateString('zh-HK', {year:'numeric',month:'2-digit',day:'2-digit'}),
+    totalKm: total || null,
+    fuelL: fuel,
+    totalCost: totalCost || null,
+    tripKm: trip,
+    adjFactor,
+    notes
+  };
+
+  entries.unshift(entry);
+  pendingSync.push({ action: 'append', entry });
+  saveLocal();
+
+  // Clear form
+  ['f-fuel','f-totalcost','f-trip','f-total','f-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-adj').value = '100';
+  document.getElementById('preview-area').style.display = 'none';
+  showToast('✓ 已儲存本機');
+
+  // Try sync immediately
+  flushPending().then(() => {
+    if (pendingSync.length === 0) showToast('✓ 已同步到 Sheets');
+  });
+}
+
+/* ── Delete Entry ── */
+async function delEntry(i) {
+  if (!confirm('確認刪除此記錄？')) return;
+  const entry = entries[i];
+  entries.splice(i, 1);
+  pendingSync.push({ action: 'delete', id: entry.id });
+  saveLocal();
+  renderHistory();
+  showToast('已刪除');
+  flushPending();
+}
+
+/* ── Tabs ── */
+function showTab(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'analysis') renderAnalysis();
+  if (name === 'history') renderHistory();
+  if (name === 'settings') loadSettingsUI();
+}
+
+/* ── Analysis ── */
+function delta(curr, prev, lowerBetter) {
+  if (prev === null || prev === undefined) return '<span class="badge neutral">首次</span>';
+  const d = curr - prev;
+  if (Math.abs(d) < 0.0001) return '<span class="badge neutral">持平</span>';
+  const pct = Math.abs(d / prev * 100).toFixed(1);
+  const better = lowerBetter ? d < 0 : d > 0;
+  const sign = d > 0 ? '+' : '';
+  return `<span class="badge ${better?'better':'worse'}">${sign}${pct}%</span>`;
+}
+
+function renderAnalysis() {
+  const el = document.getElementById('analysis-body');
+  if (entries.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">尚未有記錄</div></div>';
+    return;
+  }
+  const curr = entries[0], prev = entries.length > 1 ? entries[1] : null;
+  const cC = calc(curr), cP = prev ? calc(prev) : null;
+  const avgCons = entries.map(e => calc(e).consumption).reduce((a,b)=>a+b,0) / entries.length;
+
+  let html = `<div class="section-label">最新油耗</div>
+  <div class="big-metric"><span class="big-num">${cC.consumption.toFixed(2)}</span><span class="big-unit">L/100km</span></div>`;
+
+  if (entries.length > 1) {
+    html += `<div class="section-label">今次 vs 上次</div><div class="compare-card">`;
+    html += `<div class="compare-row"><div>
+      <div class="compare-label">油耗 (L/100km)</div>
+      <div class="compare-nums">${cP ? `<span class="prev-num">${cP.consumption.toFixed(2)}</span><span style="color:var(--text3);font-size:13px;">→</span>` : ''}
+      <span class="curr-num">${cC.consumption.toFixed(2)}</span></div></div>
+      ${delta(cC.consumption, cP?.consumption, true)}</div>`;
+
+    if (cC.pricePerL) {
+      html += `<div class="compare-row"><div>
+        <div class="compare-label">油價 ($/L)</div>
+        <div class="compare-nums">${(cP && cP.pricePerL) ? `<span class="prev-num">$${cP.pricePerL.toFixed(2)}</span><span style="color:var(--text3);font-size:13px;">→</span>` : ''}
+        <span class="curr-num">$${cC.pricePerL.toFixed(2)}</span></div></div>
+        ${delta(cC.pricePerL, cP?.pricePerL, true)}</div>`;
+    }
+    if (cC.costPerKm) {
+      html += `<div class="compare-row"><div>
+        <div class="compare-label">$/每公里</div>
+        <div class="compare-nums">${(cP && cP.costPerKm) ? `<span class="prev-num">$${cP.costPerKm.toFixed(3)}</span><span style="color:var(--text3);font-size:13px;">→</span>` : ''}
+        <span class="curr-num">$${cC.costPerKm.toFixed(3)}</span></div></div>
+        ${delta(cC.costPerKm, cP?.costPerKm, true)}</div>`;
+    }
+    html += `<div class="compare-row"><div>
+      <div class="compare-label">調整後里程</div>
+      <div class="compare-nums">${cP ? `<span class="prev-num">${cP.adjTrip.toFixed(1)} km</span><span style="color:var(--text3);font-size:13px;">→</span>` : ''}
+      <span class="curr-num">${cC.adjTrip.toFixed(1)} km</span></div></div>
+      ${delta(cC.adjTrip, cP?.adjTrip, false)}</div>`;
+    if (cC.totalCost) {
+      html += `<div class="compare-row"><div>
+        <div class="compare-label">入油總價</div>
+        <div class="compare-nums">${(cP && cP.totalCost) ? `<span class="prev-num">$${cP.totalCost.toFixed(1)}</span><span style="color:var(--text3);font-size:13px;">→</span>` : ''}
+        <span class="curr-num">$${cC.totalCost.toFixed(1)}</span></div></div>
+        ${delta(cC.totalCost, cP?.totalCost, true)}</div>`;
+    }
+    if (curr.adjFactor !== 100 && curr.adjFactor != null) {
+      html += `<div class="compare-row"><span style="font-size:12px;color:var(--text2);">誤差調整：${curr.adjFactor}% 已套用</span></div>`;
+    }
+    html += '</div>';
+  }
+
+  html += `<div class="section-label">統計</div>
+  <div class="card">
+    <div class="card-row"><span class="row-label">記錄次數</span><span style="font-size:16px;font-weight:600;">${entries.length}</span></div>
+    <div class="card-row"><span class="row-label">平均油耗</span><span style="font-size:16px;font-weight:600;">${avgCons.toFixed(2)} L/100km</span></div>
+    <div class="card-row"><span class="row-label">最佳油耗</span><span style="font-size:16px;font-weight:600;color:var(--green);">${Math.min(...entries.map(e=>calc(e).consumption)).toFixed(2)} L/100km</span></div>
+  </div>`;
+
+  if (entries.length >= 2) {
+    html += `<div class="section-label">油耗趨勢</div>
+    <div class="chart-container"><div class="chart-wrap"><canvas id="trendChart"></canvas></div></div>`;
+  }
+  el.innerHTML = html;
+
+  if (entries.length >= 2) {
+    const rev = [...entries].reverse();
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    requestAnimationFrame(() => {
+      drawLineChart('trendChart', rev.map(e => e.date.slice(5)), rev.map(e => parseFloat(calc(e).consumption.toFixed(2))), isDark);
+    });
+  }
+}
+
+/* ── History ── */
+function renderHistory() {
+  const el = document.getElementById('history-body');
+  if (entries.length === 0) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon">🕐</div><div class="empty-text">尚未有記錄</div></div>';
+    return;
+  }
+  const pendingIds = new Set(pendingSync.filter(p=>p.action==='append').map(p=>p.entry?.id));
+  let html = `<div class="section-label">全部記錄（${entries.length} 次）</div><div class="card">`;
+  entries.forEach((e, i) => {
+    const c = calc(e);
+    const ppl = (e.totalCost && e.fuelL) ? (e.totalCost / e.fuelL).toFixed(2) : null;
+    const isPending = pendingIds.has(e.id);
+    html += `<div class="history-item">
+      <div class="history-date">${e.date}${isPending ? '<br><span style="font-size:10px;color:var(--yellow);">待同步</span>' : ''}</div>
+      <div class="history-main">
+        <div class="history-cons">${c.consumption.toFixed(2)} L/100km</div>
+        <div class="history-sub">${e.fuelL}L${e.totalCost ? ' · $'+e.totalCost.toFixed(0) : ''}${ppl ? ' · $'+ppl+'/L' : ''}${c.costPerKm ? ' · $'+c.costPerKm.toFixed(3)+'/km' : ''}</div>
+      </div>
+      ${e.notes ? `<span class="history-note" title="${e.notes}">${e.notes}</span>` : ''}
+      <button class="del-btn" onclick="delEntry(${i})">刪除</button>
+    </div>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+/* ── Settings UI ── */
+function loadSettingsUI() {
+  document.getElementById('s-webapp').value = cfg.webAppUrl || '';
+  document.getElementById('s-sheetid').value = cfg.sheetId || '';
+  document.getElementById('s-sheetname').value = cfg.sheetName || '燃油記錄';
+  updateSyncUI();
+}
+
+function saveSettings() {
+  cfg.webAppUrl = document.getElementById('s-webapp').value.trim();
+  cfg.sheetId = document.getElementById('s-sheetid').value.trim();
+  cfg.sheetName = document.getElementById('s-sheetname').value.trim() || '燃油記錄';
+  saveCfg();
+  updateSyncUI();
+  showToast('✓ 設定已儲存');
+  if (pendingSync.length > 0) flushPending();
+}
+
+async function testConnection() {
+  const url = document.getElementById('s-webapp').value.trim();
+  if (!url) { showToast('請先填寫 Web App URL'); return; }
+  showToast('測試中…');
+  try {
+    const res = await fetch(url);
+    const json = await res.json();
+    if (json.ok) showToast('✓ 連線成功！');
+    else showToast('❌ 連線失敗: ' + (json.error || ''));
+  } catch(e) {
+    showToast('❌ ' + e.message);
+  }
+}
+
+async function syncNow() {
+  if (!cfg.webAppUrl) { showToast('請先設定 Web App URL'); return; }
+  await flushPending();
+  if (pendingSync.length === 0) showToast('✓ 全部已同步');
+  else showToast(`⚠️ 仍有 ${pendingSync.length} 筆待同步`);
+  updateSyncUI();
+}
+
+async function importFromSheets() {
+  if (!cfg.webAppUrl) { showToast('請先設定 Web App URL'); return; }
+  showToast('匯入中…');
+  try {
+    const data = await sheetsPost({ action: 'getAll' });
+    if (data.rows && data.rows.length > 0) {
+      // Merge: keep local entries not in sheets, add all from sheets
+      const sheetsIds = new Set(data.rows.map(r => String(r.id)));
+      const localOnly = entries.filter(e => !sheetsIds.has(String(e.id)));
+      // Combine and sort by id desc
+      const merged = [...data.rows, ...localOnly].sort((a,b) => b.id - a.id);
+      entries = merged;
+      pendingSync = []; // Sheets is source of truth
+      saveLocal();
+      showToast(`✓ 已匯入 ${data.rows.length} 筆記錄`);
+    } else {
+      showToast('Sheets 暫無記錄');
+    }
+  } catch(e) {
+    showToast('❌ ' + e.message);
+  }
+  updateSyncUI();
+}
+
+function clearLocal() {
+  if (!confirm('確認清除所有本機資料？此動作不會刪除 Google Sheets 的資料。')) return;
+  entries = [];
+  pendingSync = [];
+  saveLocal();
+  showToast('已清除本機資料');
+  updateSyncUI();
+}
+
+/* ── Toast ── */
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+/* ── Init ── */
+loadLocal();
+updateSyncUI();
+
+// Auto sync on load if there are pending items
+if (cfg.webAppUrl && pendingSync.length > 0) {
+  flushPending();
+}
+</script>
+</body>
+</html>
