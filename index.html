@@ -259,7 +259,7 @@ function doGet(e) {
      本機資料仍保留
    ═══════════════════════════════════════════ */
 let entries = [];
-let cfg = { webAppUrl:'https://script.google.com/macros/s/AKfycbxWPKhJ3COO3haOmN7TffLNFwAI1_h6moO408ylz6TbMuxSVczbfr0iOKfkbNazoffztg/exec', sheetId:'1_8GGNZF5Qc651p_k1WWsDmVyQ9H4nKzzwLkKAlOS29g', sheetName:'工作表1' };
+let cfg = { webAppUrl:'https://script.google.com/macros/s/AKfycbxWPKhJ3COO3haOmN7TffLNFwAI1_h6moO408ylz6TbMuxSVczbfr0iOKfkbNazoffztg/exec', sheetId:'1_8GGNZF5Qc651p_k1WWsDmVyQ9H4nKzzwLkKAlOS29g', sheetName:'' };
 
 const LS_CFG     = 'fuel_cfg_v2';
 const LS_ENTRIES = 'fuel_entries_v2';
@@ -306,7 +306,7 @@ function setSyncState(state, label) {
 async function sheetsPost(payload) {
   if (!cfg.webAppUrl) throw new Error('請先設定 Web App URL');
   payload.sheetId   = cfg.sheetId;
-  payload.sheetName = cfg.sheetName || '工作表1';
+  payload.sheetName = cfg.sheetName || '';
   const res  = await fetch(cfg.webAppUrl, { method:'POST', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(payload) });
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || '未知錯誤');
