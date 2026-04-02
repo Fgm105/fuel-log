@@ -138,12 +138,12 @@
       <div class="section-label">入油資料</div>
       <div class="card">
         <div class="card-row"><span class="row-label">入油日子</span><input class="row-input" type="text" id="f-date" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" style="width:130px;"></div>
-        <div class="card-row"><span class="row-label">總里程</span><input class="row-input" type="number" id="f-total" inputmode="decimal" placeholder="85420"><span class="row-unit">km</span></div>
+        <div class="card-row"><span class="row-label">OBO總里程</span><input class="row-input" type="number" id="f-total" inputmode="decimal" placeholder="85420"><span class="row-unit">km</span></div>
         <div class="card-row"><span class="row-label">入油量</span><input class="row-input" type="number" id="f-fuel"  inputmode="decimal" placeholder="42.5"><span class="row-unit">L</span></div>
         <div class="card-row"><span class="row-label">入油總價</span><input class="row-input" type="number" id="f-totalcost" inputmode="decimal" placeholder="83.50"><span class="row-unit">$</span></div>
         <div class="card-row"><span class="row-label">行駛里程</span><input class="row-input" type="number" id="f-trip" inputmode="decimal" placeholder="430"><span class="row-unit">km</span></div>
-        <div class="card-row"><span class="row-label">誤差調整</span><input class="adj-input" type="number" id="f-adj" inputmode="decimal" value="100"><span class="row-unit">%</span></div>
-        <div class="card-row" style="align-items:flex-start;padding-top:13px;"><span class="row-label">備註</span><textarea class="row-input" id="f-notes" placeholder="冬/四季胎？岩岩做左保養？"></textarea></div>
+        <div class="card-row"><span class="row-label">里程誤差調整</span><input class="adj-input" type="number" id="f-adj" inputmode="decimal" value="100"><span class="row-unit">%</span></div>
+        <div class="card-row" style="align-items:flex-start;padding-top:13px;"><span class="row-label">備註</span><textarea class="row-input" id="f-notes" placeholder="冬胎/四季胎？做左保養？"></textarea></div>
       </div>
       <div id="preview-area" style="display:none;">
         <div class="section-label">即時計算</div>
@@ -168,7 +168,7 @@
       <div class="card">
         <div class="card-row">
           <span class="row-label">ID Name</span>
-          <input class="row-input-full" type="text" id="s-sheetname" placeholder="輸入工作表名稱">
+          <input class="row-input-full" type="text" id="s-sheetname" placeholder="輸入記錄ID名稱">
         </div>
         <div class="card-row">
           <span class="row-label">快取記錄</span>
@@ -644,7 +644,7 @@ function fmtDateLong(raw) {         // → DD/MM/YYYY for history list
    avg  均  prev  →  curr   [badge]
    Each value can be null/undefined → hidden  */
 function cmpRow3(label, avgVal, prevVal, currVal, badge) {
-  const avgTag  = avgVal  ? `<span class="cmp-avg">${avgVal}</span><span class="cmp-sep">均</span>` : '';
+  const avgTag  = avgVal  ? `<span class="cmp-avg">${avgVal}</span><span class="cmp-sep">平均</span>` : '';
   const prevTag = prevVal ? `<span class="cmp-prev">${prevVal}</span><span class="cmp-arrow">→</span>` : '';
   return `<div class="compare-row">
     <div style="flex:1;min-width:0;">
@@ -678,7 +678,7 @@ function renderAnalysis() {
   let h=`<div class="section-label">最新油耗</div>
   <div class="big-metric"><span class="big-num">${cC.consumption.toFixed(2)}</span><span class="big-unit">L/100km</span></div>`;
 
-  h+=`<div class="section-label">近20次均 · 上次 · 今次</div><div class="compare-card">`;
+  h+=`<div class="section-label">近20次平均 · 上次 · 今次</div><div class="compare-card">`;
 
   /* 油耗 */
   h+=cmpRow3('油耗 (L/100km)',
