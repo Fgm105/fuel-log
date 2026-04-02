@@ -73,12 +73,18 @@
   .big-num  { font-size:42px; font-weight:700; letter-spacing:-1px; }
   .big-unit { font-size:16px; color:var(--text2); }
   .compare-card { background:var(--card); border-radius:var(--radius); margin-bottom:20px; overflow:hidden; }
-  .compare-row  { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; border-bottom:0.5px solid var(--border); }
+  .compare-row  { display:flex; align-items:flex-start; justify-content:space-between; padding:14px 16px; border-bottom:0.5px solid var(--border); gap:8px; }
   .compare-row:last-child { border-bottom:none; }
   .compare-label { font-size:13px; color:var(--text2); margin-bottom:4px; }
   .compare-nums  { display:flex; align-items:baseline; gap:8px; }
-  .prev-num { font-size:14px; color:var(--text3); }
-  .curr-num { font-size:18px; font-weight:600; }
+  .curr-num { font-size:18px; font-weight:600; color:var(--text); }
+  .prev-num { font-size:14px; color:var(--text2); }
+  .cmp-nums  { display:flex; align-items:baseline; gap:5px; flex-wrap:wrap; margin-top:3px; }
+  .cmp-avg   { font-size:13px; color:var(--text2); }
+  .cmp-sep   { font-size:10px; color:var(--text3); background:var(--bg); padding:1px 5px; border-radius:4px; margin-right:2px; }
+  .cmp-prev  { font-size:14px; color:var(--text2); }
+  .cmp-arrow { font-size:12px; color:var(--text3); }
+  .cmp-curr  { font-size:20px; font-weight:700; color:var(--text); letter-spacing:-0.3px; }
   .badge        { font-size:12px; font-weight:600; padding:4px 8px; border-radius:6px; }
   .badge.better { background:var(--green-bg); color:var(--green); }
   .badge.worse  { background:var(--red-bg);   color:var(--red); }
@@ -105,6 +111,8 @@
   .loading-row { display:flex; align-items:center; justify-content:center; padding:48px 20px; gap:10px; color:var(--text2); font-size:15px; }
   .spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; flex-shrink:0; }
   @keyframes spin { to { transform:rotate(360deg); } }
+  details[open] summary span:first-child { transform:rotate(90deg); display:inline-block; }
+  details summary::-webkit-details-marker { display:none; }
 </style>
 </head>
 <body>
@@ -129,12 +137,13 @@
     <div class="page active" id="page-log">
       <div class="section-label">入油資料</div>
       <div class="card">
+        <div class="card-row"><span class="row-label">入油日子</span><input class="row-input" type="text" id="f-date" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" style="width:130px;"></div>
         <div class="card-row"><span class="row-label">總里程</span><input class="row-input" type="number" id="f-total" inputmode="decimal" placeholder="85420"><span class="row-unit">km</span></div>
         <div class="card-row"><span class="row-label">入油量</span><input class="row-input" type="number" id="f-fuel"  inputmode="decimal" placeholder="42.5"><span class="row-unit">L</span></div>
-        <div class="card-row"><span class="row-label">入油總價</span><input class="row-input" type="number" id="f-totalcost" inputmode="decimal" placeholder="830.00"><span class="row-unit">$</span></div>
-        <div class="card-row"><span class="row-label">Trip 里程</span><input class="row-input" type="number" id="f-trip" inputmode="decimal" placeholder="430"><span class="row-unit">km</span></div>
+        <div class="card-row"><span class="row-label">入油總價</span><input class="row-input" type="number" id="f-totalcost" inputmode="decimal" placeholder="83.50"><span class="row-unit">$</span></div>
+        <div class="card-row"><span class="row-label">行駛里程</span><input class="row-input" type="number" id="f-trip" inputmode="decimal" placeholder="430"><span class="row-unit">km</span></div>
         <div class="card-row"><span class="row-label">誤差調整</span><input class="adj-input" type="number" id="f-adj" inputmode="decimal" value="100"><span class="row-unit">%</span></div>
-        <div class="card-row" style="align-items:flex-start;padding-top:13px;"><span class="row-label">備註</span><textarea class="row-input" id="f-notes" placeholder="高速公路為主..."></textarea></div>
+        <div class="card-row" style="align-items:flex-start;padding-top:13px;"><span class="row-label">備註</span><textarea class="row-input" id="f-notes" placeholder="冬/四季胎？岩岩做左保養？"></textarea></div>
       </div>
       <div id="preview-area" style="display:none;">
         <div class="section-label">即時計算</div>
@@ -151,29 +160,37 @@
 
     <!-- SETTINGS -->
     <div class="page" id="page-settings">
-      <div class="section-label">Google Sheets 連線</div>
-      <div class="card">
-        <div class="card-row"><span class="row-label">Web App URL</span><input class="row-input-full" type="url" id="s-webapp" inputmode="url" placeholder="https://script.google.com/macros/s/..."></div>
-        <div class="card-row"><span class="row-label">Sheet ID</span><input class="row-input-full" type="text" id="s-sheetid" placeholder="1BxiMVs0XRA5nF..."></div>
-        <div class="card-row"><span class="row-label">Sheet 名稱</span><input class="row-input-full" type="text" id="s-sheetname" placeholder="工作表1"></div>
-      </div>
-      <button class="btn-secondary" onclick="testConnection()">🔗 測試連線</button>
-      <button class="btn-primary" style="margin-top:0;" onclick="saveSettings()">儲存設定</button>
+      <!-- hidden inputs: URL & Sheet ID managed by JS only -->
+      <input type="hidden" id="s-webapp">
+      <input type="hidden" id="s-sheetid">
 
-      <div class="section-label" style="margin-top:8px;">資料狀態</div>
+      <div class="section-label">雲端數據</div>
       <div class="card">
-        <div class="card-row"><span class="row-label">快取記錄數</span><span id="local-count" style="font-size:16px;font-weight:600;">0</span></div>
-        <div class="card-row"><span class="row-label">上次同步</span><span id="last-sync-time" style="font-size:14px;color:var(--text2);">—</span></div>
+        <div class="card-row">
+          <span class="row-label">ID Name</span>
+          <input class="row-input-full" type="text" id="s-sheetname" placeholder="輸入工作表名稱">
+        </div>
+        <div class="card-row">
+          <span class="row-label">快取記錄</span>
+          <span id="local-count" style="font-size:15px;font-weight:600;color:var(--text2);">0</span>
+        </div>
+        <div class="card-row">
+          <span class="row-label">上次同步</span>
+          <span id="last-sync-time" style="font-size:14px;color:var(--text2);">—</span>
+        </div>
       </div>
-      <button class="btn-secondary" onclick="loadFromSheets()">🔄 立即同步 Sheets</button>
-      <button class="btn-danger" onclick="clearCache()">🗑️ 清除本機快取</button>
+      <button class="btn-primary" onclick="saveSettings()">儲存並同步</button>
 
-      <div class="section-label" style="margin-top:4px;">Apps Script 程式碼</div>
-      <div class="info-box" style="font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;">function doPost(e) {
+      <details style="margin-bottom:20px;">
+        <summary style="font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;margin:0 4px 0;">
+          <span>▶</span><span>Apps Script 程式碼</span>
+        </summary>
+        <div class="info-box" style="margin-top:10px;font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;">function doPost(e) {
   try {
     const data = JSON.parse(e.postData.contents);
     const ss = SpreadsheetApp.openById(data.sheetId);
-    const sh = ss.getSheetByName(data.sheetName) || ss.getSheets()[0];
+    let sh = ss.getSheetByName(data.sheetName);
+    if (!sh) { sh = ss.insertSheet(data.sheetName); }
 
     if (data.action === 'append') {
       if (sh.getLastRow() === 0) {
@@ -222,6 +239,7 @@ function doGet(e) {
     .createTextOutput(JSON.stringify({ok:true,status:'ready'}))
     .setMimeType(ContentService.MimeType.JSON);
 }</div>
+      </details>
     </div>
 
   </div><!-- .content -->
@@ -241,7 +259,7 @@ function doGet(e) {
      本機資料仍保留
    ═══════════════════════════════════════════ */
 let entries = [];
-let cfg = { webAppUrl:'', sheetId:'', sheetName:'工作表1' };
+let cfg = { webAppUrl:'https://script.google.com/macros/s/AKfycbxWPKhJ3COO3haOmN7TffLNFwAI1_h6moO408ylz6TbMuxSVczbfr0iOKfkbNazoffztg/exec', sheetId:'1_8GGNZF5Qc651p_k1WWsDmVyQ9H4nKzzwLkKAlOS29g', sheetName:'工作表1' };
 
 const LS_CFG     = 'fuel_cfg_v2';
 const LS_ENTRIES = 'fuel_entries_v2';
@@ -310,6 +328,8 @@ async function bgSync() {
     if (active?.id==='page-analysis') renderAnalysis();
     if (active?.id==='page-history')  renderHistory();
     if (active?.id==='page-settings') loadSettingsUI();
+    /* Always refresh adj default from latest synced data */
+    refreshAdjDefault();
   } catch(e) {
     /* 網路失敗 — 保留快取資料，顯示 error 但不清空 */
     setSyncState('error', `快取 ${entries.length} 筆（離線）`);
@@ -331,6 +351,7 @@ async function loadFromSheets() {
     if (active?.id==='page-analysis') renderAnalysis();
     if (active?.id==='page-history')  renderHistory();
     if (active?.id==='page-settings') loadSettingsUI();
+    refreshAdjDefault();
   } catch(e) {
     setSyncState('error', `快取 ${entries.length} 筆（離線）`);
     showToast('❌ '+e.message+'（顯示本機快取）');
@@ -345,7 +366,8 @@ function calc(e) {
   const totalCost  = e.totalCost ? parseFloat(e.totalCost) : null;
   const pricePerL  = (totalCost && e.fuelL)  ? totalCost/e.fuelL  : null;
   const costPerKm  = (totalCost && adjTrip)  ? totalCost/adjTrip  : null;
-  return { adjTrip, consumption, totalCost, pricePerL, costPerKm };
+  const costPer10km = costPerKm ? costPerKm*10 : null;
+  return { adjTrip, consumption, totalCost, pricePerL, costPerKm, costPer10km };
 }
 
 /* ── Live preview ── */
@@ -358,14 +380,47 @@ function liveCalc() {
   const adjTrip=trip*(adj/100), cons=fuel/adjTrip*100;
   const ppl=(totalCost&&fuel)?totalCost/fuel:null, cpp=(totalCost&&adjTrip)?totalCost/adjTrip:null;
   document.getElementById('preview-area').style.display='';
+  const cpp10=(totalCost&&adjTrip)?totalCost/adjTrip*10:null;
   document.getElementById('preview-grid').innerHTML=`
-    <div class="mini-card"><div class="mini-label">調整後里程</div><div class="mini-val">${adjTrip.toFixed(1)}<span class="mini-unit"> km</span></div></div>
+    <div class="mini-card"><div class="mini-label">行洗里程</div><div class="mini-val">${adjTrip.toFixed(1)}<span class="mini-unit"> km</span></div></div>
     <div class="mini-card"><div class="mini-label">油耗</div><div class="mini-val">${cons.toFixed(2)}<span class="mini-unit"> L/100</span></div></div>
     ${ppl?`<div class="mini-card"><div class="mini-label">油價</div><div class="mini-val">$${ppl.toFixed(2)}<span class="mini-unit">/L</span></div></div>`:''}
-    ${cpp?`<div class="mini-card"><div class="mini-label">每公里費用</div><div class="mini-val">$${cpp.toFixed(3)}</div></div>`:''}`;
+    ${cpp10?`<div class="mini-card"><div class="mini-label">$/10km</div><div class="mini-val">$${cpp10.toFixed(2)}</div></div>`:''}`;
 }
 ['f-fuel','f-totalcost','f-trip','f-total','f-adj','f-notes'].forEach(id=>
   document.getElementById(id).addEventListener('input',liveCalc));
+
+/* Set date input to today (DD/MM/YYYY) and adj to last entry's adjFactor */
+function resetFormDefaults() {
+  const now=new Date();
+  const dd=String(now.getDate()).padStart(2,'0');
+  const mm=String(now.getMonth()+1).padStart(2,'0');
+  const yyyy=now.getFullYear();
+  document.getElementById('f-date').value=`${dd}/${mm}/${yyyy}`;
+  refreshAdjDefault();
+}
+
+/* Update adj default from latest entry — only if form fields are all empty */
+function refreshAdjDefault() {
+  const adjEl=document.getElementById('f-adj');
+  const fuelEl=document.getElementById('f-fuel');
+  const tripEl=document.getElementById('f-trip');
+  // Only update if user hasn't started a new entry
+  if(!fuelEl.value && !tripEl.value) {
+    const lastAdj=entries.length ? entries[0].adjFactor : 100;
+    adjEl.value = lastAdj || 100;
+  }
+}
+resetFormDefaults();
+
+/* Auto-insert slashes as user types date DD/MM/YYYY */
+document.getElementById('f-date').addEventListener('input', function(ev) {
+  let v=this.value.replace(/[^0-9]/g,'');
+  if(v.length>2) v=v.slice(0,2)+'/'+v.slice(2);
+  if(v.length>5) v=v.slice(0,5)+'/'+v.slice(5);
+  if(v.length>10) v=v.slice(0,10);
+  this.value=v;
+});
 
 /* ── Save ── */
 async function saveEntry() {
@@ -375,11 +430,14 @@ async function saveEntry() {
   const total=parseFloat(document.getElementById('f-total').value);
   const adjFactor=parseFloat(document.getElementById('f-adj').value)||100;
   const notes=document.getElementById('f-notes').value.trim();
-  if(!fuel||!trip){showToast('請填寫入油量及 Trip 里程');return;}
+  const dateVal=document.getElementById('f-date').value.trim();
+  if(!fuel||!trip){showToast('請填寫入油量及行駛里程');return;}
   if(!cfg.webAppUrl){showToast('請先在設定頁填入 Web App URL');return;}
+  /* Use as-is (DD/MM/YYYY); fallback to today */
+  let dateStr=dateVal||`${String(new Date().getDate()).padStart(2,'0')}/${String(new Date().getMonth()+1).padStart(2,'0')}/${new Date().getFullYear()}`;
   const entry={
     id:Date.now(),
-    date:new Date().toLocaleDateString('zh-HK',{year:'numeric',month:'2-digit',day:'2-digit'}),
+    date:dateStr,
     totalKm:total||null, fuelL:fuel, totalCost:totalCost||null,
     tripKm:trip, adjFactor, notes
   };
@@ -387,7 +445,7 @@ async function saveEntry() {
   entries.unshift(entry);
   cacheEntries();
   ['f-fuel','f-totalcost','f-trip','f-total','f-notes'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('f-adj').value='100';
+  resetFormDefaults();
   document.getElementById('preview-area').style.display='none';
   showToast('✓ 已儲存');
   /* 背景送到 Sheets */
@@ -537,39 +595,137 @@ function cmpRow(label,prevVal,currVal,badge) {
     <span class="curr-num">${currVal}</span></div></div>${badge}</div>`;
 }
 
+/* ── Date helpers ──────────────────────────
+   Handles all formats we may receive:
+   • DD/MM/YYYY  (stored by this app)
+   • YYYY-MM-DD  (HTML date input)
+   • ISO timestamp or Sheets serial date
+     that Google sometimes returns as
+     e.g. "31T06:00:00.000Z/03/2026"
+   Returns a JS Date or null.
+   ──────────────────────────────────────── */
+function parseDate(raw) {
+  if(!raw) return null;
+  const s = String(raw).trim();
+
+  // DD/MM/YYYY  (primary stored format)
+  const dmY = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if(dmY) return new Date(+dmY[3], +dmY[2]-1, +dmY[1]);
+
+  // YYYY-MM-DD or YYYY/MM/DD
+  const Ymd = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if(Ymd) return new Date(+Ymd[1], +Ymd[2]-1, +Ymd[3]);
+
+  // Google Sheets may return a JS Date object serialised as ISO string
+  const iso = new Date(s);
+  if(!isNaN(iso)) return iso;
+
+  return null;
+}
+
+function fmtDateShort(raw) {        // → DD/MM for chart X axis
+  const d = parseDate(raw);
+  if(!d) return String(raw).slice(0,5);
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  return `${dd}/${mm}`;
+}
+
+function fmtDateLong(raw) {         // → DD/MM/YYYY for history list
+  const d = parseDate(raw);
+  if(!d) return String(raw);
+  const dd=String(d.getDate()).padStart(2,'0');
+  const mm=String(d.getMonth()+1).padStart(2,'0');
+  const yyyy=d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+/* Helper: build a 3-col comparison row
+   avg  均  prev  →  curr   [badge]
+   Each value can be null/undefined → hidden  */
+function cmpRow3(label, avgVal, prevVal, currVal, badge) {
+  const avgTag  = avgVal  ? `<span class="cmp-avg">${avgVal}</span><span class="cmp-sep">均</span>` : '';
+  const prevTag = prevVal ? `<span class="cmp-prev">${prevVal}</span><span class="cmp-arrow">→</span>` : '';
+  return `<div class="compare-row">
+    <div style="flex:1;min-width:0;">
+      <div class="compare-label">${label}</div>
+      <div class="cmp-nums">${avgTag}${prevTag}<span class="cmp-curr">${currVal}</span></div>
+    </div>
+    <div style="flex-shrink:0;margin-left:10px;">${badge}</div>
+  </div>`;
+}
+
 function renderAnalysis() {
   const el=document.getElementById('analysis-body');
   if(!entries.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">尚未有記錄</div></div>';return;}
-  const curr=entries[0],prev=entries[1]||null,cC=calc(curr),cP=prev?calc(prev):null;
-  const avg=entries.map(e=>calc(e).consumption).reduce((a,b)=>a+b,0)/entries.length;
-  const best=Math.min(...entries.map(e=>calc(e).consumption));
+
+  const curr=entries[0], prev=entries[1]||null;
+  const cC=calc(curr), cP=prev?calc(prev):null;
+
+  /* Last 20 averages */
+  const last20=entries.slice(0,20);
+  const avg20=last20.map(e=>calc(e).consumption).reduce((a,b)=>a+b,0)/last20.length;
+
+  const c10List =last20.map(e=>calc(e).costPer10km).filter(Boolean);
+  const avg20c10 =c10List.length ? c10List.reduce((a,b)=>a+b,0)/c10List.length : null;
+
+  const pplList  =last20.map(e=>calc(e).pricePerL).filter(Boolean);
+  const avg20ppl =pplList.length ? pplList.reduce((a,b)=>a+b,0)/pplList.length : null;
+
+  const allCons=entries.map(e=>calc(e).consumption);
+  const best=Math.min(...allCons), worst=Math.max(...allCons);
 
   let h=`<div class="section-label">最新油耗</div>
   <div class="big-metric"><span class="big-num">${cC.consumption.toFixed(2)}</span><span class="big-unit">L/100km</span></div>`;
 
-  if(prev){
-    h+=`<div class="section-label">今次 vs 上次</div><div class="compare-card">`;
-    h+=cmpRow('油耗 (L/100km)', cP?.consumption?.toFixed(2), cC.consumption.toFixed(2), delta(cC.consumption,cP?.consumption,true));
-    if(cC.pricePerL)  h+=cmpRow('油價 ($/L)',  cP?.pricePerL?'$'+cP.pricePerL.toFixed(2):null,   '$'+cC.pricePerL.toFixed(2),  delta(cC.pricePerL, cP?.pricePerL, true));
-    if(cC.costPerKm)  h+=cmpRow('$/每公里',    cP?.costPerKm?'$'+cP.costPerKm.toFixed(3):null,   '$'+cC.costPerKm.toFixed(3),  delta(cC.costPerKm,cP?.costPerKm,true));
-    h+=cmpRow('調整後里程', cP?cP.adjTrip.toFixed(1)+' km':null, cC.adjTrip.toFixed(1)+' km', delta(cC.adjTrip,cP?.adjTrip,false));
-    if(cC.totalCost)  h+=cmpRow('入油總價', cP?.totalCost?'$'+parseFloat(cP.totalCost).toFixed(0):null, '$'+cC.totalCost.toFixed(0), delta(cC.totalCost,cP?.totalCost,true));
-    h+='</div>';
+  h+=`<div class="section-label">近20次均 · 上次 · 今次</div><div class="compare-card">`;
+
+  /* 油耗 */
+  h+=cmpRow3('油耗 (L/100km)',
+    avg20.toFixed(2),
+    cP ? cP.consumption.toFixed(2) : null,
+    cC.consumption.toFixed(2),
+    delta(cC.consumption, cP?.consumption, true));
+
+  /* $/10km */
+  if(cC.costPer10km){
+    h+=cmpRow3('$/10km',
+      avg20c10 ? '$'+avg20c10.toFixed(2) : null,
+      (cP&&cP.costPer10km) ? '$'+cP.costPer10km.toFixed(2) : null,
+      '$'+cC.costPer10km.toFixed(2),
+      delta(cC.costPer10km, cP?.costPer10km, true));
   }
 
+  /* 油價 $/L — now includes avg20 */
+  if(cC.pricePerL){
+    h+=cmpRow3('油價 ($/L)',
+      avg20ppl ? '$'+avg20ppl.toFixed(2) : null,
+      (cP&&cP.pricePerL) ? '$'+cP.pricePerL.toFixed(2) : null,
+      '$'+cC.pricePerL.toFixed(2),
+      delta(cC.pricePerL, cP?.pricePerL, true));
+  }
+
+  /* 行駛里程 */
+  h+=cmpRow3('行駛里程',
+    null,
+    cP ? cP.adjTrip.toFixed(1)+' km' : null,
+    cC.adjTrip.toFixed(1)+' km',
+    delta(cC.adjTrip, cP?.adjTrip, false));
+
+  h+='</div>';
+
+  /* Stats */
   h+=`<div class="section-label">統計</div><div class="card">
     <div class="card-row"><span class="row-label">記錄次數</span><span style="font-size:16px;font-weight:600;">${entries.length}</span></div>
-    <div class="card-row"><span class="row-label">平均油耗</span><span style="font-size:16px;font-weight:600;">${avg.toFixed(2)} L/100km</span></div>
+    <div class="card-row"><span class="row-label">近20次平均油耗</span><span style="font-size:16px;font-weight:600;">${avg20.toFixed(2)} L/100km</span></div>
     <div class="card-row"><span class="row-label">最佳油耗</span><span style="font-size:16px;font-weight:600;color:var(--green);">${best.toFixed(2)} L/100km</span></div>
+    <div class="card-row"><span class="row-label">最差油耗</span><span style="font-size:16px;font-weight:600;color:var(--red);">${worst.toFixed(2)} L/100km</span></div>
   </div>`;
 
   if(entries.length>=2){
     const rev=[...entries].reverse();
-    const cData =rev.map(e=>parseFloat(calc(e).consumption.toFixed(2)));
-    const cLabels=rev.map(e=>{
-      const d=String(e.date), p=d.split(/[\/\-]/);
-      return p.length===3?`${p[1]}/${p[2]}`:d.slice(-5);
-    });
+    const cData  =rev.map(e=>parseFloat(calc(e).consumption.toFixed(2)));
+    const cLabels=rev.map(e=>fmtDateShort(e.date));
     h+=`<div class="section-label">油耗趨勢 (L/100km)</div>
     <div class="chart-container">${buildChart(cData,cLabels)}</div>`;
   }
@@ -582,14 +738,21 @@ function renderHistory() {
   if(!entries.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">🕐</div><div class="empty-text">尚未有記錄</div></div>';return;}
   let h=`<div class="section-label">全部記錄（${entries.length} 次）</div><div class="card">`;
   entries.forEach((e,i)=>{
-    const c=calc(e), ppl=(e.totalCost&&e.fuelL)?(parseFloat(e.totalCost)/e.fuelL).toFixed(2):null;
+    const c=calc(e);
+    const ppl=(e.totalCost&&e.fuelL)?(parseFloat(e.totalCost)/e.fuelL).toFixed(2):null;
+    const stats=[
+      `${e.fuelL}L`,
+      e.totalCost?'$'+parseFloat(e.totalCost).toFixed(0):null,
+      ppl?'$'+ppl+'/L':null,
+      c.costPer10km?'$'+c.costPer10km.toFixed(2)+'/10km':null,
+    ].filter(Boolean).join(' · ');
     h+=`<div class="history-item">
-      <div class="history-date">${e.date}</div>
+      <div class="history-date" style="min-width:80px;">${fmtDateLong(e.date)}</div>
       <div class="history-main">
         <div class="history-cons">${c.consumption.toFixed(2)} L/100km</div>
-        <div class="history-sub">${e.fuelL}L${e.totalCost?' · $'+parseFloat(e.totalCost).toFixed(0):''}${ppl?' · $'+ppl+'/L':''}${c.costPerKm?' · $'+c.costPerKm.toFixed(3)+'/km':''}</div>
+        ${e.notes?`<div class="history-sub" style="color:var(--text2);margin-top:1px;">${e.notes}</div>`:''}
+        <div class="history-sub">${stats}</div>
       </div>
-      ${e.notes?`<span class="history-note" title="${e.notes}">${e.notes}</span>`:''}
       <button class="del-btn" onclick="delEntry(${i})">刪除</button>
     </div>`;
   });
@@ -600,20 +763,21 @@ function renderHistory() {
 function loadSettingsUI() {
   document.getElementById('s-webapp').value    = cfg.webAppUrl ||'';
   document.getElementById('s-sheetid').value   = cfg.sheetId   ||'';
-  document.getElementById('s-sheetname').value = cfg.sheetName ||'工作表1';
+  document.getElementById('s-sheetname').value = cfg.sheetName ||'';
   const c=document.getElementById('local-count');    if(c) c.textContent=entries.length;
   const t=document.getElementById('last-sync-time'); if(t) t.textContent=syncTimestamp();
 }
 function saveSettings() {
   cfg.webAppUrl = document.getElementById('s-webapp').value.trim();
   cfg.sheetId   = document.getElementById('s-sheetid').value.trim();
-  cfg.sheetName = document.getElementById('s-sheetname').value.trim()||'工作表1';
-  saveCfg(); showToast('✓ 設定已儲存');
-  if(cfg.webAppUrl) loadFromSheets();
+  cfg.sheetName = document.getElementById('s-sheetname').value.trim(); // keep blank if blank
+  saveCfg();
+  showToast('✓ 設定已儲存，同步中…');
+  loadFromSheets();
 }
 async function testConnection() {
-  const url=document.getElementById('s-webapp').value.trim();
-  if(!url){showToast('請先填寫 Web App URL');return;}
+  const url=(document.getElementById('s-webapp').value||cfg.webAppUrl||'').trim();
+  if(!url){showToast('請先設定 Web App URL');return;}
   showToast('測試中…');
   try{const r=await fetch(url),j=await r.json(); showToast(j.ok?'✓ 連線成功！':'❌ '+(j.error||'失敗'));}
   catch(e){showToast('❌ '+e.message);}
