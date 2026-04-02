@@ -160,12 +160,13 @@
       <button class="btn-secondary" onclick="testConnection()">🔗 測試連線</button>
       <button class="btn-primary" style="margin-top:0;" onclick="saveSettings()">儲存設定</button>
 
-      <div class="section-label" style="margin-top:8px;">資料</div>
+      <div class="section-label" style="margin-top:8px;">資料狀態</div>
       <div class="card">
-        <div class="card-row"><span class="row-label">已載入記錄</span><span id="local-count" style="font-size:16px;font-weight:600;">0</span></div>
+        <div class="card-row"><span class="row-label">快取記錄數</span><span id="local-count" style="font-size:16px;font-weight:600;">0</span></div>
+        <div class="card-row"><span class="row-label">上次同步</span><span id="last-sync-time" style="font-size:14px;color:var(--text2);">—</span></div>
       </div>
-      <button class="btn-secondary" onclick="loadFromSheets()">🔄 重新載入資料</button>
-      <button class="btn-danger" onclick="clearMemory()">🗑️ 清除記憶體資料</button>
+      <button class="btn-secondary" onclick="loadFromSheets()">🔄 立即同步 Sheets</button>
+      <button class="btn-danger" onclick="clearCache()">🗑️ 清除本機快取</button>
 
       <div class="section-label" style="margin-top:4px;">Apps Script 程式碼</div>
       <div class="info-box" style="font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-all;">function doPost(e) {
@@ -229,24 +230,58 @@ function doGet(e) {
 
 <script>
 /* ═══════════════════════════════════════════
-   Google Sheets = sole database.
-   entries[] lives in memory only.
-   cfg persisted in sessionStorage so
-   settings survive page refresh.
+   方案 A — localStorage 作持久快取
+   ───────────────────────────────────────────
+   • cfg   → localStorage 永久保留設定
+   • entries → localStorage 快取記錄
+   • 啟動時：立即從 localStorage 顯示舊資料，
+     同時背景向 Sheets 拉最新資料靜默更新
+   • 寫入/刪除：先更新記憶體+localStorage，
+     同時送 Sheets；失敗時標示 error 但
+     本機資料仍保留
    ═══════════════════════════════════════════ */
 let entries = [];
 let cfg = { webAppUrl:'', sheetId:'', sheetName:'工作表1' };
 
+const LS_CFG     = 'fuel_cfg_v2';
+const LS_ENTRIES = 'fuel_entries_v2';
+const LS_TS      = 'fuel_sync_ts';        // 上次成功同步時間戳
+
 function loadCfg() {
-  try { const s = JSON.parse(sessionStorage.getItem('fuel_cfg')||'{}'); if(s.webAppUrl) cfg=s; } catch(e){}
+  try { const s=JSON.parse(localStorage.getItem(LS_CFG)||'{}'); if(s.webAppUrl) cfg=s; } catch(e){}
 }
-function saveCfg() { sessionStorage.setItem('fuel_cfg', JSON.stringify(cfg)); }
+function saveCfg() {
+  try { localStorage.setItem(LS_CFG, JSON.stringify(cfg)); } catch(e){}
+}
+
+/* 快取 entries 到 localStorage */
+function cacheEntries() {
+  try { localStorage.setItem(LS_ENTRIES, JSON.stringify(entries)); } catch(e){
+    /* localStorage 滿了 → 只保留最近 200 筆 */
+    try { localStorage.setItem(LS_ENTRIES, JSON.stringify(entries.slice(0,200))); } catch(e2){}
+  }
+}
+
+/* 從 localStorage 載入快取 entries */
+function loadCachedEntries() {
+  try { const s=localStorage.getItem(LS_ENTRIES); if(s) entries=JSON.parse(s); } catch(e){}
+}
+
+/* 上次同步時間 */
+function syncTimestamp() {
+  const ts=localStorage.getItem(LS_TS);
+  if(!ts) return '從未同步';
+  const d=new Date(parseInt(ts));
+  return d.toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'});
+}
+function saveSyncTs() { localStorage.setItem(LS_TS, Date.now().toString()); }
 
 /* ── Sync UI ── */
 function setSyncState(state, label) {
   document.getElementById('syncDot').className = 'sync-dot' + (state ? ' '+state : '');
   document.getElementById('syncLabel').textContent = label;
-  const c = document.getElementById('local-count'); if(c) c.textContent = entries.length;
+  const c=document.getElementById('local-count'); if(c) c.textContent=entries.length;
+  const t=document.getElementById('last-sync-time'); if(t) t.textContent=syncTimestamp();
 }
 
 /* ── Sheets fetch ── */
@@ -260,25 +295,45 @@ async function sheetsPost(payload) {
   return json;
 }
 
-async function loadFromSheets() {
-  if (!cfg.webAppUrl) { showToast('請先設定 Web App URL'); return; }
-  setSyncState('syncing','載入中…');
-  document.getElementById('analysis-body').innerHTML = '<div class="loading-row"><div class="spinner"></div>載入資料中…</div>';
-  document.getElementById('history-body').innerHTML  = '<div class="loading-row"><div class="spinner"></div>載入資料中…</div>';
+/* 靜默背景同步 — 不影響 UI，完成後更新資料 */
+async function bgSync() {
+  if (!cfg.webAppUrl) return;
   try {
     const data = await sheetsPost({ action:'getAll' });
-    entries = (data.rows||[]).sort((a,b)=>b.id-a.id);
+    const fresh = (data.rows||[]).sort((a,b)=>b.id-a.id);
+    entries = fresh;
+    cacheEntries();
+    saveSyncTs();
     setSyncState('synced', `已同步 ${entries.length} 筆`);
-    showToast(`✓ 已載入 ${entries.length} 筆記錄`);
-    /* refresh visible page */
+    /* 靜默更新當前頁 */
     const active = document.querySelector('.page.active');
     if (active?.id==='page-analysis') renderAnalysis();
     if (active?.id==='page-history')  renderHistory();
+    if (active?.id==='page-settings') loadSettingsUI();
   } catch(e) {
-    setSyncState('error','載入失敗');
-    showToast('❌ '+e.message);
-    document.getElementById('analysis-body').innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">'+e.message+'</div></div>';
-    document.getElementById('history-body').innerHTML  = document.getElementById('analysis-body').innerHTML;
+    /* 網路失敗 — 保留快取資料，顯示 error 但不清空 */
+    setSyncState('error', `快取 ${entries.length} 筆（離線）`);
+  }
+}
+
+/* 手動重新載入（顯示 loading 提示） */
+async function loadFromSheets() {
+  if (!cfg.webAppUrl) { showToast('請先設定 Web App URL'); return; }
+  setSyncState('syncing','同步中…');
+  try {
+    const data = await sheetsPost({ action:'getAll' });
+    entries = (data.rows||[]).sort((a,b)=>b.id-a.id);
+    cacheEntries();
+    saveSyncTs();
+    setSyncState('synced', `已同步 ${entries.length} 筆`);
+    showToast(`✓ 已載入 ${entries.length} 筆記錄`);
+    const active = document.querySelector('.page.active');
+    if (active?.id==='page-analysis') renderAnalysis();
+    if (active?.id==='page-history')  renderHistory();
+    if (active?.id==='page-settings') loadSettingsUI();
+  } catch(e) {
+    setSyncState('error', `快取 ${entries.length} 筆（離線）`);
+    showToast('❌ '+e.message+'（顯示本機快取）');
   }
 }
 
@@ -328,28 +383,45 @@ async function saveEntry() {
     totalKm:total||null, fuelL:fuel, totalCost:totalCost||null,
     tripKm:trip, adjFactor, notes
   };
-  setSyncState('syncing','儲存中…');
+  /* 先寫本機快取，UI 即時反應 */
+  entries.unshift(entry);
+  cacheEntries();
+  ['f-fuel','f-totalcost','f-trip','f-total','f-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-adj').value='100';
+  document.getElementById('preview-area').style.display='none';
+  showToast('✓ 已儲存');
+  /* 背景送到 Sheets */
+  setSyncState('syncing','同步中…');
   try {
     await sheetsPost({action:'append',row:entry});
-    entries.unshift(entry);
+    saveSyncTs();
     setSyncState('synced',`已同步 ${entries.length} 筆`);
-    ['f-fuel','f-totalcost','f-trip','f-total','f-notes'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('f-adj').value='100';
-    document.getElementById('preview-area').style.display='none';
-    showToast('✓ 已儲存到 Sheets');
-  } catch(e) { setSyncState('error','儲存失敗'); showToast('❌ '+e.message); }
+    showToast('✓ 已同步到 Sheets');
+  } catch(e) {
+    setSyncState('error',`快取 ${entries.length} 筆（離線）`);
+    showToast('⚠️ 網路失敗，資料已保留本機');
+  }
 }
 
 /* ── Delete ── */
 async function delEntry(i) {
   if(!confirm('確認刪除此記錄？'))return;
-  setSyncState('syncing','刪除中…');
+  const entry=entries[i];
+  /* 先從本機移除 */
+  entries.splice(i,1);
+  cacheEntries();
+  renderHistory();
+  showToast('已刪除');
+  /* 背景同步到 Sheets */
+  setSyncState('syncing','同步中…');
   try {
-    await sheetsPost({action:'delete',id:entries[i].id});
-    entries.splice(i,1);
+    await sheetsPost({action:'delete',id:entry.id});
+    saveSyncTs();
     setSyncState('synced',`已同步 ${entries.length} 筆`);
-    renderHistory(); showToast('已刪除');
-  } catch(e) { setSyncState('error','刪除失敗'); showToast('❌ '+e.message); }
+  } catch(e) {
+    setSyncState('error',`快取 ${entries.length} 筆（離線）`);
+    showToast('⚠️ Sheets 刪除失敗，請稍後手動同步');
+  }
 }
 
 /* ── Tabs ── */
@@ -526,10 +598,11 @@ function renderHistory() {
 
 /* ── Settings ── */
 function loadSettingsUI() {
-  document.getElementById('s-webapp').value   = cfg.webAppUrl  ||'';
-  document.getElementById('s-sheetid').value  = cfg.sheetId    ||'';
-  document.getElementById('s-sheetname').value= cfg.sheetName  ||'工作表1';
-  const c=document.getElementById('local-count'); if(c) c.textContent=entries.length;
+  document.getElementById('s-webapp').value    = cfg.webAppUrl ||'';
+  document.getElementById('s-sheetid').value   = cfg.sheetId   ||'';
+  document.getElementById('s-sheetname').value = cfg.sheetName ||'工作表1';
+  const c=document.getElementById('local-count');    if(c) c.textContent=entries.length;
+  const t=document.getElementById('last-sync-time'); if(t) t.textContent=syncTimestamp();
 }
 function saveSettings() {
   cfg.webAppUrl = document.getElementById('s-webapp').value.trim();
@@ -545,9 +618,12 @@ async function testConnection() {
   try{const r=await fetch(url),j=await r.json(); showToast(j.ok?'✓ 連線成功！':'❌ '+(j.error||'失敗'));}
   catch(e){showToast('❌ '+e.message);}
 }
-function clearMemory() {
-  if(!confirm('確認清除記憶體資料？\nGoogle Sheets 資料不受影響，重新載入頁面即可恢復。'))return;
-  entries=[]; setSyncState('','未連線'); showToast('已清除');
+function clearCache() {
+  if(!confirm('確認清除本機快取？\nGoogle Sheets 資料不受影響。'))return;
+  entries=[];
+  try { localStorage.removeItem(LS_ENTRIES); localStorage.removeItem(LS_TS); } catch(e){}
+  setSyncState('','未連線'); showToast('已清除本機快取');
+  renderAnalysis(); renderHistory();
 }
 
 /* ── Toast ── */
@@ -559,8 +635,17 @@ function showToast(msg) {
 
 /* ── Init ── */
 loadCfg();
-if(cfg.webAppUrl) loadFromSheets();
-else setSyncState('','未連線');
+loadCachedEntries();          // 立即顯示本機快取
+if(entries.length) {
+  setSyncState('synced', `快取 ${entries.length} 筆`);
+  renderAnalysis();
+  renderHistory();
+}
+if(cfg.webAppUrl) {
+  bgSync();                   // 背景靜默拉最新資料
+} else {
+  setSyncState('', entries.length ? `快取 ${entries.length} 筆（未連線）` : '未連線');
+}
 </script>
 </body>
 </html>
